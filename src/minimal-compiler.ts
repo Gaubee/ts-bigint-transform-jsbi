@@ -1,7 +1,11 @@
 import * as ts from "typescript";
 import { TransformerFactory } from "./transformer";
 export function CompileFactory(
-  opts: { JSBI_GLOBAL_SYMBOL_NAME?: string; IMPORT_HEADER?: string } = {}
+  opts: {
+    JSBI_GLOBAL_SYMBOL_NAME?: string;
+    IMPORT_HEADER?: string;
+    verbose?: boolean;
+  } = {}
 ) {
   return function compile(
     fileNames: string[],

@@ -40,7 +40,7 @@ const binaryWithEqualKindToFunctionName = new Map([
  */
 export function TransformerFactory(
   typeChecker: ts.TypeChecker,
-  opts: { JSBI_GLOBAL_SYMBOL_NAME?: string }
+  opts: { JSBI_GLOBAL_SYMBOL_NAME?: string; verbose?: boolean }
 ) {
   const { JSBI_GLOBAL_SYMBOL_NAME: BI = "JSBI" } = opts;
 
@@ -77,11 +77,11 @@ export function TransformerFactory(
           );
         }
 
-        let visitorInOutCount = 0;
-        const visitor: ts.Visitor = (node: ts.Node): ts.Node => {
-          const oldCount = visitorInOutCount;
-          // try {
-          visitorInOutCount += 1;
+        const visitorInOutCount = new Set<number>();
+        let visitorId = 0;
+        let visitor: ts.Visitor = (node: ts.Node): ts.Node => {
+          const id = visitorId++;
+          visitorInOutCount.add(id);
           /**
            * 值的声明
            */
@@ -137,7 +137,10 @@ export function TransformerFactory(
             if (jsbiFunctionName) {
               if (
                 [leftType, rightType].every(type => {
-                  return type.flags === ts.TypeFlags.BigInt;
+                  return (
+                    type.flags === ts.TypeFlags.BigInt ||
+                    type.flags === ts.TypeFlags.BigIntLiteral
+                  );
                 })
               ) {
                 // `${BI}.${jsbiFunctionName}(${node.left.getText()},${node.right.getText()})`
@@ -158,7 +161,10 @@ export function TransformerFactory(
             if (jsbiFunctionWithEqualsName) {
               if (
                 [leftType, rightType].every(type => {
-                  return type.flags === ts.TypeFlags.BigInt;
+                  return (
+                    type.flags === ts.TypeFlags.BigInt ||
+                    type.flags === ts.TypeFlags.BigIntLiteral
+                  );
                 })
               ) {
                 // `${left}=${BI}.${jsbiFunctionWithEqualsName}(${left},${node.right.getText()})`
@@ -235,29 +241,35 @@ export function TransformerFactory(
             }
           }
 
-          visitorInOutCount -= 1;
+          visitorInOutCount.delete(id);
           return ts.visitEachChild(node, visitor, ctx);
-          // } finally {
-          //   console.log(
-          //     "node:",
-          //     ts.SyntaxKind[node.kind],
-          //     (() => {
-          //       try {
-          //         return node.getText();
-          //       } catch {
-          //         return "";
-          //       }
-          //     })(),
-          //     oldCount !== visitorInOutCount ? "✔" : ""
-          //   );
-          // }
         };
+        if (opts.verbose) {
+          const _visitor = visitor;
+          visitor = (node: ts.Node) => {
+            const id = visitorId;
+            const res = _visitor(node);
+            console.log(
+              "node:",
+              ts.SyntaxKind[node.kind],
+              (() => {
+                try {
+                  return node.getText();
+                } catch {
+                  return "";
+                }
+              })(),
+              visitorInOutCount.has(id) ? "✔" : ""
+            );
+            return res;
+          };
+        }
         sf = ts.visitNode(sf, visitor);
         /**
          * 如果计数器没有归0，说明触发了BigInt相关的转换
          * 这时候就需要在文件头部注入自定义代码片段
          */
-        bigintTransformCount.set(sf, visitorInOutCount);
+        bigintTransformCount.set(sf, visitorInOutCount.size);
 
         return sf;
       };

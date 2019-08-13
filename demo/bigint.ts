@@ -51,3 +51,5 @@ function foo(a: bigint, b: string | bigint, c: BigInt): bigint | string {
 }
 
 foo(a + b, a * b + c1, (a *= b + a));
+
+const d1 = c1 % c2 >= c3 ? c4 + 1n : c4;
