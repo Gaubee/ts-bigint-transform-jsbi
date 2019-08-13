@@ -49,6 +49,12 @@ export function TransformerFactory(
     bigintTransformCount,
     transformer(ctx: ts.TransformationContext): ts.Transformer<ts.SourceFile> {
       return (sf: ts.SourceFile) => {
+        function isBigIntLike(type: ts.Type) {
+          return (
+            type.flags === ts.TypeFlags.BigInt ||
+            type.flags === ts.TypeFlags.BigIntLiteral
+          );
+        }
         function createJSBIBigIntLiteral(val: string | number) {
           return createJSBICall("BigInt", [
             ts.createStringLiteral(val.toString()) //ts.createStringLiteral(val.toString())
@@ -124,8 +130,7 @@ export function TransformerFactory(
           if (ts.isBinaryExpression(node)) {
             const leftType = typeChecker.getTypeAtLocation(node.left);
             const rightType = typeChecker.getTypeAtLocation(node.right);
-            node.operatorToken;
-            ts.SyntaxKind.PlusToken;
+
             const jsbiFunctionName = binaryKindToFunctionName.get(
               node.operatorToken.kind
             );
@@ -135,14 +140,7 @@ export function TransformerFactory(
              * 否则应该随着默认的类型转换来进行
              */
             if (jsbiFunctionName) {
-              if (
-                [leftType, rightType].every(type => {
-                  return (
-                    type.flags === ts.TypeFlags.BigInt ||
-                    type.flags === ts.TypeFlags.BigIntLiteral
-                  );
-                })
-              ) {
+              if ([leftType, rightType].every(isBigIntLike)) {
                 // `${BI}.${jsbiFunctionName}(${node.left.getText()},${node.right.getText()})`
                 return createJSBICall(jsbiFunctionName, [
                   node.left,
@@ -159,14 +157,7 @@ export function TransformerFactory(
              * 否则应该随着默认的类型转换来进行
              */
             if (jsbiFunctionWithEqualsName) {
-              if (
-                [leftType, rightType].every(type => {
-                  return (
-                    type.flags === ts.TypeFlags.BigInt ||
-                    type.flags === ts.TypeFlags.BigIntLiteral
-                  );
-                })
-              ) {
+              if ([leftType, rightType].every(isBigIntLike)) {
                 // `${left}=${BI}.${jsbiFunctionWithEqualsName}(${left},${node.right.getText()})`
                 return createSetVarWithCall(
                   jsbiFunctionWithEqualsName,
@@ -179,7 +170,10 @@ export function TransformerFactory(
           /**
            * 前置运算符
            */
-          if (ts.isPrefixUnaryExpression(node)) {
+          if (
+            ts.isPrefixUnaryExpression(node) &&
+            isBigIntLike(typeChecker.getTypeAtLocation(node))
+          ) {
             switch (node.operator) {
               case ts.SyntaxKind.PlusPlusToken: // ++a
                 // `(${operand}=${BI}.ADD(${operand},BigInt(1)))`
@@ -213,7 +207,10 @@ export function TransformerFactory(
           /**
            * 后置运算符
            */
-          if (ts.isPostfixUnaryExpression(node)) {
+          if (
+            ts.isPostfixUnaryExpression(node) &&
+            isBigIntLike(typeChecker.getTypeAtLocation(node))
+          ) {
             let funName = "";
             switch (node.operator) {
               case ts.SyntaxKind.PlusPlusToken: // a++
