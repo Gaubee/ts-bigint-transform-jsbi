@@ -1,6 +1,8 @@
 {
   "name": "ts-bigint-transform-jsbi",
-  "version": "0.2.0",
+  "version": "0.3.0",
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
   "dependencies": {
     "typescript": "^3.5.3"
   },

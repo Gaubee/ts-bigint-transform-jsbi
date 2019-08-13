@@ -44,67 +44,80 @@ export function TransformerFactory(
 ) {
   const { JSBI_GLOBAL_SYMBOL_NAME: BI = "JSBI" } = opts;
 
-  function createJSBIBigIntLiteral(
-    // typeArguments?: ts.TypeNode[],
-    argumentsArray?: ts.Expression[]
-  ) {
-    return ts.createCall(
-      ts.createPropertyAccess(ts.createIdentifier(BI), "BigInt"),
-      undefined,
-      argumentsArray
-    );
-  }
   const bigintTransformCount = new WeakMap<ts.SourceFile, number>();
   return {
     bigintTransformCount,
     transformer(ctx: ts.TransformationContext): ts.Transformer<ts.SourceFile> {
       return (sf: ts.SourceFile) => {
+        function createJSBIBigIntLiteral(val: string | number) {
+          return createJSBICall("BigInt", [
+            ts.createStringLiteral(val.toString()) //ts.createStringLiteral(val.toString())
+          ]);
+        }
+        function createJSBICall(
+          callName: string,
+          argumentsArray?: ts.Expression[]
+        ) {
+          return ts.createCall(
+            ts.createPropertyAccess(ts.createIdentifier(BI), callName),
+            undefined,
+            argumentsArray &&
+              argumentsArray.map(argNode => ts.visitNode(argNode, visitor))
+          );
+        }
+        function createSetVarWithCall(
+          callName: string,
+          left: ts.Expression,
+          right: ts.Expression
+        ) {
+          return ts.createBinary(
+            left,
+            ts.SyntaxKind.EqualsToken,
+            createJSBICall(callName, [left, right])
+          );
+        }
+
         let visitorInOutCount = 0;
         const visitor: ts.Visitor = (node: ts.Node): ts.Node => {
+          const oldCount = visitorInOutCount;
+          // try {
           visitorInOutCount += 1;
           /**
            * 值的声明
            */
           if (ts.isBigIntLiteral(node)) {
             const text = node.getText();
-            const stringLiteral = ts.createStringLiteral(
-              text.substr(0, text.length - 1)
-            );
-            return createJSBIBigIntLiteral(
-              // [ts.createLiteralTypeNode(stringLiteral)],
-              [ts.createLiteral(stringLiteral)]
-            );
-            // ts.createProgram;
-            // return ts.createIdentifier(
-            //   `${BI}.BigInt('${text.substr(0, text.length - 1)}')`
-            // );
+            // `${BI}.BigInt('${text.substr(0, text.length - 1)}')`
+            return createJSBIBigIntLiteral(text.substr(0, text.length - 1));
           }
+          // #region
           /**
-         * 没必要转换`BigInt(xxx)`，因为是直接调用BigInt函数的，只要在全局替换了BigInt函数就行了
-         * 反而可能因为一个函数的返回值是BigInt，但本身不是BigInt这个全局的构造函数而误判定
-         * 比如:
-         * ```ts
-         * const a = ()=>1n;
-         * const b = a();
-         * ```
-         * 会被转成
-         * ```js
-         * const a = ()=>JSBI.BigInt('1');
-         * const b = JSBI.BigInt();
-         * ```
-         if (ts.isCallExpression(node)) {
-          const type = typeChecker.getTypeAtLocation(node.expression);
-          if (
-            type.getCallSignatures().find(signature => {
-              return signature.getReturnType().flags === ts.TypeFlags.BigInt;
-            })
-          ) {
-            return ts.createIdentifier(
-              `JSBI.BigInt(${node.arguments.map(arg => arg.getText()).join(",")})`
-            );
-          }
-        }
-         */
+             * 没必要转换`BigInt(xxx)`，因为是直接调用BigInt函数的，只要在全局替换了BigInt函数就行了
+             * 反而可能因为一个函数的返回值是BigInt，但本身不是BigInt这个全局的构造函数而误判定
+             * 比如:
+             * ```ts
+             * const a = ()=>1n;
+             * const b = a();
+             * ```
+             * 会被转成
+             * ```js
+             * const a = ()=>JSBI.BigInt('1');
+             * const b = JSBI.BigInt();
+             * ```
+                if (ts.isCallExpression(node)) {
+                  const type = typeChecker.getTypeAtLocation(node.expression);
+                  if (
+                    type.getCallSignatures().find(signature => {
+                      return signature.getReturnType().flags === ts.TypeFlags.BigInt;
+                    })
+                  ) {
+                    return ts.createIdentifier(
+                      `JSBI.BigInt(${node.arguments.map(arg => arg.getText()).join(",")})`
+                    );
+                  }
+                }
+              */
+          // #endregion
           /**
            * 二元运算符
            */
@@ -127,9 +140,11 @@ export function TransformerFactory(
                   return type.flags === ts.TypeFlags.BigInt;
                 })
               ) {
-                return ts.createIdentifier(
-                  `${BI}.${jsbiFunctionName}(${node.left.getText()},${node.right.getText()})`
-                );
+                // `${BI}.${jsbiFunctionName}(${node.left.getText()},${node.right.getText()})`
+                return createJSBICall(jsbiFunctionName, [
+                  node.left,
+                  node.right
+                ]);
               }
             }
             const jsbiFunctionWithEqualsName = binaryWithEqualKindToFunctionName.get(
@@ -146,9 +161,11 @@ export function TransformerFactory(
                   return type.flags === ts.TypeFlags.BigInt;
                 })
               ) {
-                const left = node.left.getText();
-                return ts.createIdentifier(
-                  `${left}=${BI}.${jsbiFunctionWithEqualsName}(${left},${node.right.getText()})`
+                // `${left}=${BI}.${jsbiFunctionWithEqualsName}(${left},${node.right.getText()})`
+                return createSetVarWithCall(
+                  jsbiFunctionWithEqualsName,
+                  node.left,
+                  node.right
                 );
               }
             }
@@ -157,48 +174,83 @@ export function TransformerFactory(
            * 前置运算符
            */
           if (ts.isPrefixUnaryExpression(node)) {
-            const operand = node.operand.getText();
             switch (node.operator) {
               case ts.SyntaxKind.PlusPlusToken: // ++a
-                return ts.createIdentifier(
-                  `(${operand}=${BI}.ADD(${operand},BigInt(1)))`
+                // `(${operand}=${BI}.ADD(${operand},BigInt(1)))`
+                return createSetVarWithCall(
+                  "ADD",
+                  node.operand,
+                  createJSBIBigIntLiteral(1)
                 );
               case ts.SyntaxKind.MinusMinusToken: // --a
-                return ts.createIdentifier(
-                  `(${operand}=${BI}.subtract(${operand},BigInt(1)))`
+                // `(${operand}=${BI}.subtract(${operand},BigInt(1)))`
+                return createSetVarWithCall(
+                  "subtract",
+                  node.operand,
+                  createJSBIBigIntLiteral(1)
                 );
               /**
-               * bigint 不支持+bn !nb
-               * case ts.SyntaxKind.PlusToken:
-                   break;
-                 case ts.SyntaxKind.ExclamationToken:
-                   break;
-               */
+                 * bigint 不支持+bn !nb
+                 * case ts.SyntaxKind.PlusToken:
+                     break;
+                   case ts.SyntaxKind.ExclamationToken:
+                     break;
+                 */
               case ts.SyntaxKind.TildeToken: // ~a
-                return ts.createIdentifier(`${BI}.bitwiseNot(${operand})`);
+                // `${BI}.bitwiseNot(${operand})`
+                return createJSBICall("bitwiseNot", [node.operand]);
               case ts.SyntaxKind.MinusToken: // -a
-                return ts.createIdentifier(`${BI}.unaryMinus(${operand})`);
+                // `${BI}.unaryMinus(${operand})`
+                return createJSBICall("unaryMinus", [node.operand]);
             }
           }
+          /**
+           * 后置运算符
+           */
           if (ts.isPostfixUnaryExpression(node)) {
-            const operand = node.operand.getText();
+            let funName = "";
             switch (node.operator) {
               case ts.SyntaxKind.PlusPlusToken: // a++
-                return ts.createIdentifier(
-                  `[${operand},${operand}=${BI}.ADD(${operand},BigInt(1))][0]`
-                );
+                funName = "ADD";
+                break;
               case ts.SyntaxKind.MinusMinusToken: // a--
-                return ts.createIdentifier(
-                  `[${operand},${operand}=${BI}.subtract(${operand},BigInt(1))][0]`
-                );
-              // return ts.createArrayLiteral([node.operand,ts.createBinary(node.operand,ts.SyntaxKind.EqualsToken,)],false);
+                funName = "subtract";
+                break;
+            }
+            if (funName) {
+              // `[${operand},${operand}=${BI}.ADD(${operand},BigInt(1))][0]`
+              // `[${operand},${operand}=${BI}.subtract(${operand},BigInt(1))][0]`
+              const arr = ts.createArrayLiteral(
+                [
+                  node.operand,
+                  createSetVarWithCall(
+                    funName,
+                    node.operand,
+                    createJSBIBigIntLiteral(1)
+                  )
+                ],
+                false
+              );
+              return ts.createElementAccess(arr, 0);
             }
           }
-
-          // console.log("node", ts.SyntaxKind[node.kind], node.getText());
 
           visitorInOutCount -= 1;
           return ts.visitEachChild(node, visitor, ctx);
+          // } finally {
+          //   console.log(
+          //     "node:",
+          //     ts.SyntaxKind[node.kind],
+          //     (() => {
+          //       try {
+          //         return node.getText();
+          //       } catch {
+          //         return "";
+          //       }
+          //     })(),
+          //     oldCount !== visitorInOutCount ? "✔" : ""
+          //   );
+          // }
         };
         sf = ts.visitNode(sf, visitor);
         /**

@@ -7,5 +7,5 @@ const JSBI = {
 
 let z = 0;
 z = JSBI.zz(z, JSBI.BI(2));
-"2n"
-1n
+
+[z, (z = z + 1)][0];

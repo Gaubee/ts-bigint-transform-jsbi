@@ -30,7 +30,8 @@ const c16 = a > b;
 const c17 = a >= b;
 const c18 = a <= b;
 const c19 = a <= b ? a + b : a - b;
-const c20 = a + b * (a - b);
+const c20 = a + b * (c1 - c2);
+const c20_1 = a + b * c1 - c2;
 const c21 = [a++, b--];
 a += b;
 a -= b;
@@ -44,3 +45,9 @@ a &= b;
 a |= b;
 a ^= b;
 a = b;
+
+function foo(a: bigint, b: string | bigint, c: BigInt): bigint | string {
+  throw new Error("qqq");
+}
+
+foo(a + b, a * b + c1, (a *= b + a));
