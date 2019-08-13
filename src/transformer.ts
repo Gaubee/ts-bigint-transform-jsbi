@@ -56,9 +56,24 @@ export function TransformerFactory(
           );
         }
         function createJSBIBigIntLiteral(val: string | number) {
-          return createJSBICall("BigInt", [
-            ts.createStringLiteral(val.toString()) //ts.createStringLiteral(val.toString())
-          ]);
+          let valStr: string;
+          let valNum: number;
+          if (typeof val === "string") {
+            valStr = val;
+            valNum = parseInt(valStr);
+          } else {
+            // if(typeof val ==="number")
+            valStr = val.toString();
+            valNum = val;
+          }
+          if (
+            valStr === valNum.toString() &&
+            valNum <= Number.MAX_SAFE_INTEGER &&
+            valNum >= Number.MIN_SAFE_INTEGER
+          ) {
+            return createJSBICall("BigInt", [ts.createNumericLiteral(valStr)]);
+          }
+          return createJSBICall("BigInt", [ts.createStringLiteral(valStr)]);
         }
         function createJSBICall(
           callName: string,
