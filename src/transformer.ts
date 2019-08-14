@@ -15,7 +15,7 @@ const binaryKindToFunctionName = new Map([
   [ts.SyntaxKind.EqualsEqualsEqualsToken, "equal"], // "==="
   [ts.SyntaxKind.EqualsEqualsToken, "EQ"], //"=="
   [ts.SyntaxKind.ExclamationEqualsEqualsToken, "notEqual"], // !==
-  [ts.SyntaxKind.ExclamationEqualsToken, "NEQ"], // !=
+  [ts.SyntaxKind.ExclamationEqualsToken, "NE"], // !=
   [ts.SyntaxKind.LessThanToken, "LT"], //"<"
   [ts.SyntaxKind.LessThanEqualsToken, "LE"], //"<="
   [ts.SyntaxKind.GreaterThanToken, "GT"], //">"
