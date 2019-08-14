@@ -282,6 +282,7 @@ export function TransformerFactory(
              */
             let notEqual = false;
             if (
+              parentNode &&
               ts.isBinaryExpression(parentNode) &&
               // 只有等于不等于符号能够支持 **直接模式**
               (eqTokens.has(parentNode.operatorToken.kind) ||
