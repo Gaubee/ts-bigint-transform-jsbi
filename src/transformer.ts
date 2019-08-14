@@ -37,7 +37,9 @@ const binaryWithEqualKindToFunctionName = new Map([
 
 const eqTokens = new Set([
   ts.SyntaxKind.EqualsEqualsEqualsToken,
-  ts.SyntaxKind.EqualsEqualsToken,
+  ts.SyntaxKind.EqualsEqualsToken
+]);
+const notEqualTokens = new Set([
   ts.SyntaxKind.ExclamationEqualsEqualsToken,
   ts.SyntaxKind.ExclamationEqualsToken
 ]);
@@ -278,10 +280,12 @@ export function TransformerFactory(
             /**
              * 二元运算符 `==` / `!=` / `===` / `!==`
              */
+            let notEqual = false;
             if (
               ts.isBinaryExpression(parentNode) &&
               // 只有等于不等于符号能够支持 **直接模式**
-              eqTokens.has(parentNode.operatorToken.kind)
+              (eqTokens.has(parentNode.operatorToken.kind) ||
+                (notEqual = notEqualTokens.has(parentNode.operatorToken.kind)))
             ) {
               /**
                * 兄弟节点
@@ -294,6 +298,20 @@ export function TransformerFactory(
                  * 支持最直接的`a instanceof JSBI `模式
                  */
                 if (brotherNode.text === "bigint") {
+                  if (notEqual) {
+                    return replaceParent(
+                      node,
+                      ts.createPrefix(
+                        ts.SyntaxKind.ExclamationToken,
+                        ts.updateBinary(
+                          parentNode,
+                          replaceAbleVisitEachChild(node.expression),
+                          ts.createIdentifier(BI),
+                          ts.SyntaxKind.InstanceOfKeyword
+                        )
+                      )
+                    );
+                  }
                   return replaceParent(
                     node,
                     ts.updateBinary(

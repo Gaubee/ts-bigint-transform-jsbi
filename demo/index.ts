@@ -25,3 +25,4 @@ typeof z > "bigint";
 typeof z == "string";
 // typeof z ==
 
+!((z as any) instanceof Number);
