@@ -143,36 +143,35 @@ export function TransformerFactory(
            * 二元运算符
            */
           if (ts.isBinaryExpression(node)) {
-            const leftType = typeChecker.getTypeAtLocation(node.left);
-            const rightType = typeChecker.getTypeAtLocation(node.right);
-
-            const jsbiFunctionName = binaryKindToFunctionName.get(
-              node.operatorToken.kind
-            );
-            /**
-             * 1n + 1n
-             * 无赋值的二元符号操作，左右两边必须都是bigint
-             * 否则应该随着默认的类型转换来进行
-             */
-            if (jsbiFunctionName) {
-              if ([leftType, rightType].every(isBigIntLike)) {
+            if (
+              [node.left, node.right].every(cnode =>
+                isBigIntLike(typeChecker.getTypeAtLocation(cnode))
+              )
+            ) {
+              const jsbiFunctionName = binaryKindToFunctionName.get(
+                node.operatorToken.kind
+              );
+              /**
+               * 1n + 1n
+               * 无赋值的二元符号操作，左右两边必须都是bigint
+               * 否则应该随着默认的类型转换来进行
+               */
+              if (jsbiFunctionName) {
                 // `${BI}.${jsbiFunctionName}(${node.left.getText()},${node.right.getText()})`
                 return createJSBICall(jsbiFunctionName, [
                   node.left,
                   node.right
                 ]);
               }
-            }
-            const jsbiFunctionWithEqualsName = binaryWithEqualKindToFunctionName.get(
-              node.operatorToken.kind
-            );
-            /**
-             * a += 1n
-             * 有赋值的二元符号操作，左右两边必须都是bigint
-             * 否则应该随着默认的类型转换来进行
-             */
-            if (jsbiFunctionWithEqualsName) {
-              if ([leftType, rightType].every(isBigIntLike)) {
+              const jsbiFunctionWithEqualsName = binaryWithEqualKindToFunctionName.get(
+                node.operatorToken.kind
+              );
+              /**
+               * a += 1n
+               * 有赋值的二元符号操作，左右两边必须都是bigint
+               * 否则应该随着默认的类型转换来进行
+               */
+              if (jsbiFunctionWithEqualsName) {
                 // `${left}=${BI}.${jsbiFunctionWithEqualsName}(${left},${node.right.getText()})`
                 return createSetVarWithCall(
                   jsbiFunctionWithEqualsName,
