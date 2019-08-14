@@ -14,6 +14,8 @@ const binaryKindToFunctionName = new Map([
   [ts.SyntaxKind.CaretToken, "bitwiseXor"], // "^"
   [ts.SyntaxKind.EqualsEqualsEqualsToken, "equal"], // "==="
   [ts.SyntaxKind.EqualsEqualsToken, "EQ"], //"=="
+  [ts.SyntaxKind.ExclamationEqualsEqualsToken, "notEqual"], // !==
+  [ts.SyntaxKind.ExclamationEqualsToken, "NEQ"], // !=
   [ts.SyntaxKind.LessThanToken, "LT"], //"<"
   [ts.SyntaxKind.LessThanEqualsToken, "LE"], //"<="
   [ts.SyntaxKind.GreaterThanToken, "GT"], //">"
@@ -33,6 +35,13 @@ const binaryWithEqualKindToFunctionName = new Map([
   [ts.SyntaxKind.CaretEqualsToken, "bitwiseXor"] // "^="
 ]);
 
+const eqTokens = new Set([
+  ts.SyntaxKind.EqualsEqualsEqualsToken,
+  ts.SyntaxKind.EqualsEqualsToken,
+  ts.SyntaxKind.ExclamationEqualsEqualsToken,
+  ts.SyntaxKind.ExclamationEqualsToken
+]);
+
 /**
  *
  * @param typeChecker
@@ -45,6 +54,11 @@ export function TransformerFactory(
   const { JSBI_GLOBAL_SYMBOL_NAME: BI = "JSBI" } = opts;
 
   const bigintTransformCount = new WeakMap<ts.SourceFile, number>();
+
+  const REPLACE_PARENT_FLAG = Symbol("replace-parent");
+  function replaceParent(node: ts.Node, parentNode: ts.Node) {
+    return ((node.parent as any)[REPLACE_PARENT_FLAG] = parentNode);
+  }
   return {
     bigintTransformCount,
     transformer(ctx: ts.TransformationContext): ts.Transformer<ts.SourceFile> {
@@ -96,6 +110,10 @@ export function TransformerFactory(
             ts.SyntaxKind.EqualsToken,
             createJSBICall(callName, [left, right])
           );
+        }
+        function replaceAbleVisitEachChild<T extends ts.Node>(node: T): T {
+          const newNode = ts.visitEachChild(node, visitor, ctx);
+          return (node as any)[REPLACE_PARENT_FLAG] || newNode;
         }
 
         const visitorInOutCount = new Set<number>();
@@ -251,9 +269,68 @@ export function TransformerFactory(
               return ts.createElementAccess(arr, 0);
             }
           }
+          /**
+           * typeof *
+           */
+          if (ts.isTypeOfExpression(node)) {
+            const parentNode = node.parent;
+
+            /**
+             * 二元运算符 `==` / `!=` / `===` / `!==`
+             */
+            if (
+              ts.isBinaryExpression(parentNode) &&
+              // 只有等于不等于符号能够支持 **直接模式**
+              eqTokens.has(parentNode.operatorToken.kind)
+            ) {
+              /**
+               * 兄弟节点
+               */
+              const brotherNode =
+                parentNode.right === node ? parentNode.left : parentNode.right;
+              if (ts.isStringLiteral(brotherNode)) {
+                /**
+                 * **直接模式**
+                 * 支持最直接的`a instanceof JSBI `模式
+                 */
+                if (brotherNode.text === "bigint") {
+                  return replaceParent(
+                    node,
+                    ts.updateBinary(
+                      parentNode,
+                      replaceAbleVisitEachChild(node.expression),
+                      ts.createIdentifier(BI),
+                      ts.SyntaxKind.InstanceOfKeyword
+                    )
+                  );
+                }
+                /**
+                 * **兼容模式**
+                 * 不用修改。直接支持`typeof a`
+                 */
+                if (brotherNode.text !== "object") {
+                  return replaceAbleVisitEachChild(node);
+                }
+              }
+            }
+
+            /**
+             * **通用模式**
+             * 使用`a instanceof JSBI?'bigint':typeof a`来替代
+             */
+            return ts.createConditional(
+              ts.createBinary(
+                node.expression,
+                ts.SyntaxKind.InstanceOfKeyword,
+                ts.createIdentifier(BI)
+              ),
+              ts.createStringLiteral("bigint"),
+              node
+            );
+          }
 
           visitorInOutCount.delete(id);
-          return ts.visitEachChild(node, visitor, ctx);
+          return replaceAbleVisitEachChild(node);
         };
         if (opts.verbose) {
           const _visitor = visitor;

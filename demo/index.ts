@@ -9,3 +9,19 @@ let z = 0;
 z = JSBI.zz(z, JSBI.BI(2));
 
 [z, (z = z + 1)][0];
+
+typeof z === "bigint";
+typeof z !== "bigint";
+typeof z == "bigint";
+typeof z != "bigint";
+// z instanceof JSBI ===
+typeof z === "object";
+typeof z !== "object";
+typeof z == "object";
+typeof z != "object";
+typeof z != "str" + "ing";
+typeof z > "bigint";
+// (z instanceof JSBI?'bigint':typeof z) ===
+typeof z == "string";
+// typeof z ==
+
