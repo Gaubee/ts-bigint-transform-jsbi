@@ -16,11 +16,27 @@ const binaryKindToFunctionName = new Map([
   [ts.SyntaxKind.EqualsEqualsToken, "EQ"], //"=="
   [ts.SyntaxKind.ExclamationEqualsEqualsToken, "notEqual"], // !==
   [ts.SyntaxKind.ExclamationEqualsToken, "NE"], // !=
-  [ts.SyntaxKind.LessThanToken, "LT"], //"<"
-  [ts.SyntaxKind.LessThanEqualsToken, "LE"], //"<="
-  [ts.SyntaxKind.GreaterThanToken, "GT"], //">"
-  [ts.SyntaxKind.GreaterThanEqualsToken, "GE"] //">="
+  [ts.SyntaxKind.LessThanToken, "lessThan"], //"<"
+  [ts.SyntaxKind.LessThanEqualsToken, "lessThanOrEqual"], //"<="
+  [ts.SyntaxKind.GreaterThanToken, "greaterThan"], //">"
+  [ts.SyntaxKind.GreaterThanEqualsToken, "greaterThanOrEqual"] //">="
 ]);
+const binaryKindToFunctionNameForMixTypes = new Map([
+  ...binaryKindToFunctionName.entries(),
+  [ts.SyntaxKind.EqualsEqualsToken, "EQ"], // "=="
+  [ts.SyntaxKind.ExclamationEqualsToken, "NE"], //  !=
+  [ts.SyntaxKind.LessThanToken, "LT"], // "<"
+  [ts.SyntaxKind.LessThanEqualsToken, "LE"], // "<="
+  [ts.SyntaxKind.GreaterThanToken, "GT"], // ">"
+  [ts.SyntaxKind.GreaterThanEqualsToken, "GE"], // ">="
+  [ts.SyntaxKind.PlusToken, "ADD"] // "+" 这个理论上不应该支持
+]);
+/**
+ * 带赋值的运算
+ * 因为bigint不能与其它类型进行运算，会导致类型出错：
+ * `TypeError: Cannot mix BigInt and other types, use explicit conversions`
+ * 所以不考虑提供`MixTypes`的支持
+ */
 const binaryWithEqualKindToFunctionName = new Map([
   [ts.SyntaxKind.PlusEqualsToken, "add"], //"+="
   [ts.SyntaxKind.MinusEqualsToken, "subtract"], // "-="
@@ -163,27 +179,35 @@ export function TransformerFactory(
            * 二元运算符
            */
           if (ts.isBinaryExpression(node)) {
-            if (
-              [node.left, node.right].every(cnode =>
-                isBigIntLike(typeChecker.getTypeAtLocation(cnode))
-              )
-            ) {
-              const jsbiFunctionName = binaryKindToFunctionName.get(
-                node.operatorToken.kind
-              );
+            const leftIsBigInt = isBigIntLike(
+              typeChecker.getTypeAtLocation(node.left)
+            )
+              ? 1
+              : 0;
+            const rightIsBigInt = isBigIntLike(
+              typeChecker.getTypeAtLocation(node.right)
+            )
+              ? 1
+              : 0;
+            let kindToFun: Map<ts.SyntaxKind, string> | undefined;
+            const bothIsBigInt = leftIsBigInt + rightIsBigInt;
+            if (bothIsBigInt == 1) {
+              kindToFun = binaryKindToFunctionNameForMixTypes;
+            } else if (bothIsBigInt === 2) {
+              kindToFun = binaryKindToFunctionName;
+            }
+            if (kindToFun) {
+              const biFunName = kindToFun.get(node.operatorToken.kind);
               /**
                * 1n + 1n
                * 无赋值的二元符号操作，左右两边必须都是bigint
                * 否则应该随着默认的类型转换来进行
                */
-              if (jsbiFunctionName) {
+              if (biFunName) {
                 // `${BI}.${jsbiFunctionName}(${node.left.getText()},${node.right.getText()})`
-                return createJSBICall(jsbiFunctionName, [
-                  node.left,
-                  node.right
-                ]);
+                return createJSBICall(biFunName, [node.left, node.right]);
               }
-              const jsbiFunctionWithEqualsName = binaryWithEqualKindToFunctionName.get(
+              const biAssignFunName = binaryWithEqualKindToFunctionName.get(
                 node.operatorToken.kind
               );
               /**
@@ -191,10 +215,10 @@ export function TransformerFactory(
                * 有赋值的二元符号操作，左右两边必须都是bigint
                * 否则应该随着默认的类型转换来进行
                */
-              if (jsbiFunctionWithEqualsName) {
+              if (biAssignFunName) {
                 // `${left}=${BI}.${jsbiFunctionWithEqualsName}(${left},${node.right.getText()})`
                 return createSetVarWithCall(
-                  jsbiFunctionWithEqualsName,
+                  biAssignFunName,
                   node.left,
                   node.right
                 );
@@ -356,18 +380,20 @@ export function TransformerFactory(
           visitor = (node: ts.Node) => {
             const id = visitorId;
             const res = _visitor(node);
-            console.log(
-              "node:",
-              ts.SyntaxKind[node.kind],
-              (() => {
-                try {
-                  return node.getText();
-                } catch {
-                  return "";
-                }
-              })(),
-              visitorInOutCount.has(id) ? "✔" : ""
-            );
+            if (!ts.isSourceFile(node)) {
+              console.log(
+                "node:",
+                ts.SyntaxKind[node.kind],
+                (() => {
+                  try {
+                    return node.getText();
+                  } catch {
+                    return "";
+                  }
+                })(),
+                visitorInOutCount.has(id) ? "✔" : ""
+              );
+            }
             return res;
           };
         }
