@@ -19,6 +19,7 @@ const c5 = a % b;
 const c6 = a ** b;
 const c7 = -a;
 const c8 = ~a;
+const c8_1 = !a;
 const c9 = a << b;
 const c10 = a >> b;
 const c11 = a & b;

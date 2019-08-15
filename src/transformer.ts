@@ -230,13 +230,13 @@ export function TransformerFactory(
            */
           if (
             ts.isPrefixUnaryExpression(node) &&
-            isBigIntLike(typeChecker.getTypeAtLocation(node))
+            isBigIntLike(typeChecker.getTypeAtLocation(node.operand))
           ) {
             switch (node.operator) {
               case ts.SyntaxKind.PlusPlusToken: // ++a
                 // `(${operand}=${BI}.ADD(${operand},BigInt(1)))`
                 return createSetVarWithCall(
-                  "ADD",
+                  "add",
                   node.operand,
                   createJSBIBigIntLiteral(1)
                 );
@@ -248,12 +248,15 @@ export function TransformerFactory(
                   createJSBIBigIntLiteral(1)
                 );
               /**
-                 * bigint 不支持+bn !nb
-                 * case ts.SyntaxKind.PlusToken:
-                     break;
-                   case ts.SyntaxKind.ExclamationToken:
-                     break;
-                 */
+               * bigint 不支持 `+a`
+               * case ts.SyntaxKind.PlusToken:
+               *   // throw TypeError: Cannot convert a BigInt value to a number
+               */
+              case ts.SyntaxKind.ExclamationToken:
+                return ts.createPrefix(
+                  ts.SyntaxKind.ExclamationToken,
+                  createJSBICall("toNumber", [node.operand])
+                );
               case ts.SyntaxKind.TildeToken: // ~a
                 // `${BI}.bitwiseNot(${operand})`
                 return createJSBICall("bitwiseNot", [node.operand]);
