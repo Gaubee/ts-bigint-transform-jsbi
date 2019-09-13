@@ -3,11 +3,16 @@
   "version": "0.5.0",
   "main": "./dist/src/index.js",
   "types": "./dist/src/index.d.ts",
+  "scripts": {
+    "test1": "for file in dist/test/*.test.js; do ava \"${file}\"; done",
+    "test": "powershell ./test.ps1"
+  },
   "dependencies": {
-    "typescript": "^3.5.3"
+    "typescript": "^3.6.3"
   },
   "devDependencies": {
-    "@types/node": "^12.7.1",
+    "@types/node": "^12.7.5",
+    "ava": "^2.3.0",
     "jsbi": "^3.0.1",
     "ts-node": "^8.3.0"
   },

@@ -13,7 +13,7 @@ export function CompileFactory(
     host?: ts.CompilerHost,
     oldProgram?: ts.Program,
     configFileParsingDiagnostics?: readonly ts.Diagnostic[]
-  ): void {
+  ) {
     const program = ts.createProgram(
       fileNames,
       options,
@@ -74,9 +74,10 @@ export function CompileFactory(
       }
     });
 
-    let exitCode = emitResult.emitSkipped ? 1 : 0;
-    console.log(`Process exiting with code '${exitCode}'.`);
-    process.exit(exitCode);
+    // let exitCode = emitResult.emitSkipped ? 1 : 0;
+    // console.log(`Process exiting with code '${exitCode}'.`);
+    // process.exit(exitCode);
+    return emitResult;
   };
 }
 

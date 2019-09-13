@@ -228,41 +228,40 @@ export function TransformerFactory(
           /**
            * 前置运算符
            */
-          if (
-            ts.isPrefixUnaryExpression(node) &&
-            isBigIntLike(typeChecker.getTypeAtLocation(node.operand))
-          ) {
-            switch (node.operator) {
-              case ts.SyntaxKind.PlusPlusToken: // ++a
-                // `(${operand}=${BI}.ADD(${operand},BigInt(1)))`
-                return createSetVarWithCall(
-                  "add",
-                  node.operand,
-                  createJSBIBigIntLiteral(1)
-                );
-              case ts.SyntaxKind.MinusMinusToken: // --a
-                // `(${operand}=${BI}.subtract(${operand},BigInt(1)))`
-                return createSetVarWithCall(
-                  "subtract",
-                  node.operand,
-                  createJSBIBigIntLiteral(1)
-                );
-              /**
-               * bigint 不支持 `+a`
-               * case ts.SyntaxKind.PlusToken:
-               *   // throw TypeError: Cannot convert a BigInt value to a number
-               */
-              case ts.SyntaxKind.ExclamationToken:
-                return ts.createPrefix(
-                  ts.SyntaxKind.ExclamationToken,
-                  createJSBICall("toNumber", [node.operand])
-                );
-              case ts.SyntaxKind.TildeToken: // ~a
-                // `${BI}.bitwiseNot(${operand})`
-                return createJSBICall("bitwiseNot", [node.operand]);
-              case ts.SyntaxKind.MinusToken: // -a
-                // `${BI}.unaryMinus(${operand})`
-                return createJSBICall("unaryMinus", [node.operand]);
+          if (ts.isPrefixUnaryExpression(node)) {
+            if (isBigIntLike(typeChecker.getTypeAtLocation(node.operand))) {
+              switch (node.operator) {
+                case ts.SyntaxKind.PlusPlusToken: // ++a
+                  // `(${operand}=${BI}.ADD(${operand},BigInt(1)))`
+                  return createSetVarWithCall(
+                    "add",
+                    node.operand,
+                    createJSBIBigIntLiteral(1)
+                  );
+                case ts.SyntaxKind.MinusMinusToken: // --a
+                  // `(${operand}=${BI}.subtract(${operand},BigInt(1)))`
+                  return createSetVarWithCall(
+                    "subtract",
+                    node.operand,
+                    createJSBIBigIntLiteral(1)
+                  );
+                /**
+                 * bigint 不支持 `+a`
+                 * case ts.SyntaxKind.PlusToken:
+                 *   // throw TypeError: Cannot convert a BigInt value to a number
+                 */
+                case ts.SyntaxKind.ExclamationToken:
+                  return ts.createPrefix(
+                    ts.SyntaxKind.ExclamationToken,
+                    createJSBICall("toNumber", [node.operand])
+                  );
+                case ts.SyntaxKind.TildeToken: // ~a
+                  // `${BI}.bitwiseNot(${operand})`
+                  return createJSBICall("bitwiseNot", [node.operand]);
+                case ts.SyntaxKind.MinusToken: // -a
+                  // `${BI}.unaryMinus(${operand})`
+                  return createJSBICall("unaryMinus", [node.operand]);
+              }
             }
           }
           /**

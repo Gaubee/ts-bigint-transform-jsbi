@@ -52,11 +52,37 @@ a &= b;
 a |= b;
 a ^= b;
 a = b;
+/**
+ * @TODO 修复模糊类型
+ * 应该使用ADD
+ *
+ */
+let c22: number | bigint = 1;
+++c22;
+--c22;
+c22++;
+c22--;
+c22 = 1n;
+++c22;
+--c22;
+c22++;
+c22--;
+let c22_1: number = 1;
+++c22_1;
+--c22_1;
+c22_1++;
+c22_1--;
+let c22_2 = Math.random() > 0.5 ? 1n : 1;
+++c22_2; // c22_2 instanceof JSBI?JSBI.add(...);++c22_2
+--c22_2;
+c22_2++; // c22_2 instanceof JSBI?[c22, c22 = JSBI.ADD(c22, JSBI.BigInt(1))][0];++c22_2
+c22_2--;
+typeof c22_2 === "bigint" ? (c22_2 += 1n) : (c22_2 += 2); // c22_2 instanceof JSBI ? (c22_2 = JSBI.add(c22_2, JSBI.BigInt(1))) : (c22_2 += 2);
+typeof c22_2 === "number" ? (c22_2 += 2) : (c22_2 += 1n); // typeof c22_2 === "number" ? (c22_2 += 2) : (c22_2 = JSBI.add(c22_2, JSBI.BigInt(1)));
 
 function foo(a: bigint, b: string | bigint, c: BigInt): bigint | string {
-  throw new Error("qqq");
+  return `${a},${c},${b}`;
 }
-
-foo(a + b, a * b + c1, (a *= b + a));
+const f1 = foo(a + b, a * b + c1, (a *= b + a));
 
 const d1 = c1 % c2 >= c3 ? c4 + 1n : c4;
