@@ -262,39 +262,42 @@ export function TransformerFactory(
                   // `${BI}.unaryMinus(${operand})`
                   return createJSBICall("unaryMinus", [node.operand]);
               }
+            } else {
+              //TODO: 如果有bigint类型的可能，只要不是any类型，那么就尝试判断一下类型值，然后对其进行ADD或者++
             }
           }
           /**
            * 后置运算符
            */
-          if (
-            ts.isPostfixUnaryExpression(node) &&
-            isBigIntLike(typeChecker.getTypeAtLocation(node))
-          ) {
-            let funName = "";
-            switch (node.operator) {
-              case ts.SyntaxKind.PlusPlusToken: // a++
-                funName = "ADD";
-                break;
-              case ts.SyntaxKind.MinusMinusToken: // a--
-                funName = "subtract";
-                break;
-            }
-            if (funName) {
-              // `[${operand},${operand}=${BI}.ADD(${operand},BigInt(1))][0]`
-              // `[${operand},${operand}=${BI}.subtract(${operand},BigInt(1))][0]`
-              const arr = ts.createArrayLiteral(
-                [
-                  node.operand,
-                  createSetVarWithCall(
-                    funName,
+          if (ts.isPostfixUnaryExpression(node)) {
+            if (isBigIntLike(typeChecker.getTypeAtLocation(node))) {
+              let funName = "";
+              switch (node.operator) {
+                case ts.SyntaxKind.PlusPlusToken: // a++
+                  funName = "add";
+                  break;
+                case ts.SyntaxKind.MinusMinusToken: // a--
+                  funName = "subtract";
+                  break;
+              }
+              if (funName) {
+                // `[${operand},${operand}=${BI}.ADD(${operand},BigInt(1))][0]`
+                // `[${operand},${operand}=${BI}.subtract(${operand},BigInt(1))][0]`
+                const arr = ts.createArrayLiteral(
+                  [
                     node.operand,
-                    createJSBIBigIntLiteral(1)
-                  )
-                ],
-                false
-              );
-              return ts.createElementAccess(arr, 0);
+                    createSetVarWithCall(
+                      funName,
+                      node.operand,
+                      createJSBIBigIntLiteral(1)
+                    )
+                  ],
+                  false
+                );
+                return ts.createElementAccess(arr, 0);
+              }
+            } else {
+              // TODO: 模糊类型的后置，需要先判定类型再考虑用 JSBI.add 还是 保留 a++
             }
           }
           /**

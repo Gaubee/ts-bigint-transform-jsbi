@@ -27,7 +27,7 @@ export function compileToString(code: string) {
   const filePath = path.join(tempFolder, fileName);
   fs.writeFileSync(filePath, code);
   compile([filePath], {
-    noEmitOnError: true,
+    noEmitOnError: false,
     noImplicitAny: true,
     target: ts.ScriptTarget.ESNext,
     module: ts.ModuleKind.CommonJS,
@@ -37,15 +37,25 @@ export function compileToString(code: string) {
     .readFileSync(path.join(tempFolder, `${fileBaseName}.js`), "utf-8")
     .trim();
 }
-export function $(z: TemplateStringsArray) {
-  return format(compileToString(z.join("")));
+export function joinTemplateStringsArray(z: TemplateStringsArray, args: unknown[]) {
+  let res = z[0];
+  for (let i = 1; i < z.length; i += 1) {
+    res += z[i] + String(args[i - 1]);
+  }
+  return res;
+}
+export function $(z: TemplateStringsArray, ...args: unknown[]) {
+  return compileToString(joinTemplateStringsArray(z, args));
 }
 export function format(text: string) {
   const result = ts.transpileModule(text, {
-    compilerOptions: { module: ts.ModuleKind.CommonJS }
+    compilerOptions: {
+      module: ts.ModuleKind.CommonJS,
+      target: ts.ScriptTarget.ESNext
+    }
   });
   return result.outputText;
 }
-export function _(z: TemplateStringsArray) {
-  return format(z.join(""));
+export function _(z: TemplateStringsArray, ...args: unknown[]) {
+  return format(joinTemplateStringsArray(z, args)).trim();
 }
