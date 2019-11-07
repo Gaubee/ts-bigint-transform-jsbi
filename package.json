@@ -4,11 +4,12 @@
   "main": "./dist/src/index.js",
   "types": "./dist/src/index.d.ts",
   "scripts": {
+    "dev": "tsc -w",
     "test1": "for file in dist/test/*.test.js; do ava \"${file}\"; done",
     "test": "powershell ./test.ps1"
   },
   "dependencies": {
-    "typescript": "^3.6.3"
+    "typescript": "^3.7.2"
   },
   "repository": {
     "type": "git",
