@@ -46,7 +46,7 @@ export function CompileFactory(
       undefined,
       undefined,
       {
-        after: [transformer]
+        before: [transformer]
       }
     );
 
